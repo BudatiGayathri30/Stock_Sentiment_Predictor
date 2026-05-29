@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import pandas as pd
@@ -215,13 +216,17 @@ def compute_technical_indicators(df: pd.DataFrame) -> pd.DataFrame:
     
     return df
 
-@app.get("/")
-def read_root():
+@app.get("/api/tickers")
+def get_tickers():
     return {
         "status": "healthy",
         "message": "Stock Sentiment Predictor API is running",
-        "available_tickers": available_tickers + ["GOOGL"] # Explicitly show GOOGL is supported too
+        "available_tickers": available_tickers + ["GOOGL"]
     }
+
+@app.get("/")
+def read_root():
+    return FileResponse("index.html")
 
 @app.post("/predict")
 async def predict(request: PredictRequest):
@@ -495,14 +500,30 @@ async def predict(request: PredictRequest):
         "prob_up": prob_up,
         "prob_down": prob_down,
         "current_price": float(last_row["Close"]),
+        
+        # All 20 technical/sentiment metrics
+        "daily_return": float(last_row["daily_return"]) if not np.isnan(last_row["daily_return"]) else 0.0,
+        "return_lag1": float(last_row["return_lag1"]) if not np.isnan(last_row["return_lag1"]) else 0.0,
+        "return_lag2": float(last_row["return_lag2"]) if not np.isnan(last_row["return_lag2"]) else 0.0,
+        "ma_5": float(last_row["ma_5"]) if not np.isnan(last_row["ma_5"]) else 0.0,
+        "ma_20": float(last_row["ma_20"]) if not np.isnan(last_row["ma_20"]) else 0.0,
+        "ma_50": float(last_row["ma_50"]) if not np.isnan(last_row["ma_50"]) else 0.0,
         "rsi": float(last_row["rsi"]) if not np.isnan(last_row["rsi"]) else 50.0,
         "macd": float(last_row["macd"]) if not np.isnan(last_row["macd"]) else 0.0,
         "macd_signal": float(last_row["macd_signal"]) if not np.isnan(last_row["macd_signal"]) else 0.0,
+        "bb_position": float(last_row["bb_position"]) if not np.isnan(last_row["bb_position"]) else 0.5,
+        "volume_change": float(last_row["volume_change"]) if not np.isnan(last_row["volume_change"]) else 0.0,
         "volatility": float(last_row["volatility"]) if not np.isnan(last_row["volatility"]) else 0.0,
-        "daily_return": float(last_row["daily_return"]) if not np.isnan(last_row["daily_return"]) else 0.0,
+        
+        "sentiment_mean": float(blended_sentiment_mean) if not np.isnan(blended_sentiment_mean) else 0.0,
+        "weighted_sentiment": float(blended_weighted_sentiment) if not np.isnan(blended_weighted_sentiment) else 0.0,
+        "pct_positive": float(blended_pct_positive) if not np.isnan(blended_pct_positive) else 0.0,
+        "pct_negative": float(blended_pct_negative) if not np.isnan(blended_pct_negative) else 0.0,
+        "sentiment_std": float(blended_sentiment_std) if not np.isnan(blended_sentiment_std) else 0.0,
         "tweet_count": int(sent_row["tweet_count"]),
-        "bullish_ratio": blended_bullish_ratio,
-        "sentiment_mean": blended_sentiment_mean,
+        "avg_confidence": float(sent_row["avg_confidence"]) if not np.isnan(sent_row["avg_confidence"]) else 0.0,
+        "bullish_ratio": float(blended_bullish_ratio) if not np.isnan(blended_bullish_ratio) else 0.0,
+        
         "drivers": formatted_drivers,
         "chart_data": chart_data,
         "headlines": live_news,

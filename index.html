@@ -78,6 +78,30 @@
       box-shadow: 0 0 8px var(--accent-blue);
     }
 
+    /* --- Metric Sub-tab Styles --- */
+    .m-tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-family: var(--font-heading);
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 0.45rem 1rem;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+    }
+
+    .m-tab-btn:hover {
+      color: #fff;
+    }
+
+    .m-tab-btn.active {
+      background: var(--accent-blue);
+      color: #fff;
+      box-shadow: 0 0 10px var(--accent-blue-glow);
+    }
+
     /* --- Chart Container --- */
     .chart-card-container {
       padding: 1.75rem;
@@ -1096,51 +1120,195 @@
         </div>
       </div>
 
-      <!-- 6-Card Metrics Grid -->
-      <div class="metrics-grid">
+      <!-- 20-Metric Integrated Dashboard -->
+      <div class="metrics-dashboard-section" style="margin-top: 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
         
-        <!-- Card 1: Close Price -->
-        <div class="glass-card metric-card">
-          <div class="metric-title">Current Close Price</div>
-          <div class="metric-value" id="val-price">$0.00</div>
-          <div class="metric-footer" id="val-daily-return">
-            <span>0.00%</span> today
+        <!-- Metrics Subsection Header & Tab Buttons -->
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 0.75rem; margin-top: 1rem;">
+          <h4 style="font-family: var(--font-heading); font-weight: 700; font-size: 1.15rem; color: #fff; letter-spacing: -0.01em;">Technical & Sentiment Indicators</h4>
+          
+          <div class="metrics-tabs" style="display: flex; gap: 0.25rem; background: rgba(0, 0, 0, 0.4); padding: 0.25rem; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.06);">
+            <button id="m-tab-market" class="m-tab-btn active" style="padding: 0.35rem 0.85rem; font-size: 0.8rem;">Market & Lags</button>
+            <button id="m-tab-trend" class="m-tab-btn" style="padding: 0.35rem 0.85rem; font-size: 0.8rem;">Trend & Momentum</button>
+            <button id="m-tab-sentiment" class="m-tab-btn" style="padding: 0.35rem 0.85rem; font-size: 0.8rem;">Sentiment Indices</button>
           </div>
         </div>
 
-        <!-- Card 2: RSI -->
-        <div class="glass-card metric-card">
-          <div class="metric-title">RSI (14)</div>
-          <div class="metric-value" id="val-rsi">50.0</div>
-          <div class="metric-footer" id="rsi-condition">Neutral</div>
+        <!-- Metric Tab Contents -->
+        
+        <!-- Tab 1: Market & Lags -->
+        <div id="m-content-market" class="m-tab-content metrics-grid">
+          
+          <!-- Card 1: Price -->
+          <div class="glass-card metric-card">
+            <div class="metric-title">Current Close Price</div>
+            <div class="metric-value" id="val-price">$0.00</div>
+            <div class="metric-footer" id="val-daily-return">
+              <span>0.00%</span> today
+            </div>
+          </div>
+          
+          <!-- Card 2: Daily Return -->
+          <div class="glass-card metric-card">
+            <div class="metric-title">Daily Return</div>
+            <div class="metric-value" id="val-daily-return-metric">0.00%</div>
+            <div class="metric-footer" id="lbl-daily-return">Today's change</div>
+          </div>
+          
+          <!-- Card 3: Lag 1 Return -->
+          <div class="glass-card metric-card">
+            <div class="metric-title">Yesterday's Return (Lag-1)</div>
+            <div class="metric-value" id="val-return-lag1">0.00%</div>
+            <div class="metric-footer" id="lbl-return-lag1">1-day lag return</div>
+          </div>
+
+          <!-- Card 4: Lag 2 Return -->
+          <div class="glass-card metric-card">
+            <div class="metric-title">2-Day Lag Return (Lag-2)</div>
+            <div class="metric-value" id="val-return-lag2">0.00%</div>
+            <div class="metric-footer" id="lbl-return-lag2">2-day lag return</div>
+          </div>
+
+          <!-- Card 5: 5-Day Volatility -->
+          <div class="glass-card metric-card">
+            <div class="metric-title">5-Day Volatility</div>
+            <div class="metric-value" id="val-volatility">0.00%</div>
+            <div class="metric-footer">Standard deviation of returns</div>
+          </div>
+
+          <!-- Card 6: Bollinger Band Position -->
+          <div class="glass-card metric-card" style="height: 140px;">
+            <div class="metric-title">Bollinger Band Position</div>
+            <div class="metric-value" id="val-bb-position" style="font-size: 1.6rem; margin-top: 0.25rem;">0.0%</div>
+            <div class="driver-bar-bg" style="width: 100%; height: 5px; margin: 0.35rem 0;">
+              <div class="driver-bar-fill bullish" id="bar-bb-position" style="width: 0%;"></div>
+            </div>
+            <div class="metric-footer" style="margin-top: 0;">0% Lower, 100% Upper Band</div>
+          </div>
+
+          <!-- Card 7: Volume Change -->
+          <div class="glass-card metric-card">
+            <div class="metric-title">Volume Change</div>
+            <div class="metric-value" id="val-volume-change">0.00%</div>
+            <div class="metric-footer" id="lbl-volume-change">Trading volume shift</div>
+          </div>
+
         </div>
 
-        <!-- Card 3: MACD -->
-        <div class="glass-card metric-card">
-          <div class="metric-title">MACD (12,26)</div>
-          <div class="metric-value" id="val-macd">0.00</div>
-          <div class="metric-footer" id="val-macd-signal">Signal: 0.00</div>
+        <!-- Tab 2: Trend & Momentum -->
+        <div id="m-content-trend" class="m-tab-content metrics-grid" style="display: none;">
+
+          <!-- Card 8: MA-5 -->
+          <div class="glass-card metric-card">
+            <div class="metric-title">5-Day MA</div>
+            <div class="metric-value" id="val-ma-5">$0.00</div>
+            <div class="metric-footer" id="lbl-ma-5">Short-term trend support</div>
+          </div>
+
+          <!-- Card 9: MA-20 -->
+          <div class="glass-card metric-card">
+            <div class="metric-title">20-Day MA</div>
+            <div class="metric-value" id="val-ma-20">$0.00</div>
+            <div class="metric-footer" id="lbl-ma-20">Medium-term trend support</div>
+          </div>
+
+          <!-- Card 10: MA-50 -->
+          <div class="glass-card metric-card">
+            <div class="metric-title">50-Day MA</div>
+            <div class="metric-value" id="val-ma-50">$0.00</div>
+            <div class="metric-footer" id="lbl-ma-50">Long-term trend support</div>
+          </div>
+
+          <!-- Card 11: RSI -->
+          <div class="glass-card metric-card">
+            <div class="metric-title">RSI (14)</div>
+            <div class="metric-value" id="val-rsi">50.0</div>
+            <div class="metric-footer" id="rsi-condition">Neutral</div>
+          </div>
+
+          <!-- Card 12: MACD -->
+          <div class="glass-card metric-card">
+            <div class="metric-title">MACD (12, 26)</div>
+            <div class="metric-value" id="val-macd">0.00</div>
+            <div class="metric-footer" id="val-macd-signal">Signal: 0.00</div>
+          </div>
+
+          <!-- Card 13: MACD Signal -->
+          <div class="glass-card metric-card">
+            <div class="metric-title">MACD Signal Line</div>
+            <div class="metric-value" id="val-macd-signal-metric">0.00</div>
+            <div class="metric-footer">9-day EMA reference line</div>
+          </div>
+
         </div>
 
-        <!-- Card 4: Volatility -->
-        <div class="glass-card metric-card">
-          <div class="metric-title">5-Day Volatility</div>
-          <div class="metric-value" id="val-volatility">0.00%</div>
-          <div class="metric-footer">Standard rolling variation</div>
-        </div>
+        <!-- Tab 3: Sentiment Indices -->
+        <div id="m-content-sentiment" class="m-tab-content metrics-grid" style="display: none;">
 
-        <!-- Card 5: UP Probability -->
-        <div class="glass-card metric-card">
-          <div class="metric-title">UP Probability</div>
-          <div class="metric-value" id="val-prob-up" style="color: var(--accent-green);">0%</div>
-          <div class="metric-footer">XGBoost bullish index</div>
-        </div>
+          <!-- Card 14: Sentiment Mean -->
+          <div class="glass-card metric-card">
+            <div class="metric-title">Sentiment Mean</div>
+            <div class="metric-value" id="val-sentiment-mean">0.00</div>
+            <div class="metric-footer" id="lbl-sentiment-mean">FinBERT blended average</div>
+          </div>
 
-        <!-- Card 6: DOWN Probability -->
-        <div class="glass-card metric-card">
-          <div class="metric-title">DOWN Probability</div>
-          <div class="metric-value" id="val-prob-down" style="color: var(--accent-red);">0%</div>
-          <div class="metric-footer">XGBoost bearish index</div>
+          <!-- Card 15: Weighted Sentiment -->
+          <div class="glass-card metric-card">
+            <div class="metric-title">Weighted Sentiment</div>
+            <div class="metric-value" id="val-weighted-sentiment">0.00</div>
+            <div class="metric-footer" id="lbl-weighted-sentiment">Sentiment scaled by confidence</div>
+          </div>
+
+          <!-- Card 16: Bullish News Ratio -->
+          <div class="glass-card metric-card" style="height: 140px;">
+            <div class="metric-title">Bullish News Ratio</div>
+            <div class="metric-value" id="val-pct-positive" style="color: var(--accent-green); font-size: 1.6rem; margin-top: 0.25rem;">0.0%</div>
+            <div class="driver-bar-bg" style="width: 100%; height: 5px; margin: 0.35rem 0;">
+              <div class="driver-bar-fill bullish" id="bar-pct-positive" style="width: 0%;"></div>
+            </div>
+            <div class="metric-footer" style="margin-top: 0;">FinBERT bullish labels</div>
+          </div>
+
+          <!-- Card 17: Bearish News Ratio -->
+          <div class="glass-card metric-card" style="height: 140px;">
+            <div class="metric-title">Bearish News Ratio</div>
+            <div class="metric-value" id="val-pct-negative" style="color: var(--accent-red); font-size: 1.6rem; margin-top: 0.25rem;">0.0%</div>
+            <div class="driver-bar-bg" style="width: 100%; height: 5px; margin: 0.35rem 0;">
+              <div class="driver-bar-fill bearish" id="bar-pct-negative" style="width: 0%;"></div>
+            </div>
+            <div class="metric-footer" style="margin-top: 0;">FinBERT bearish labels</div>
+          </div>
+
+          <!-- Card 18: Sentiment Dispersion -->
+          <div class="glass-card metric-card">
+            <div class="metric-title">Sentiment Std Dev</div>
+            <div class="metric-value" id="val-sentiment-std">0.00</div>
+            <div class="metric-footer">Polarization / consensus metrics</div>
+          </div>
+
+          <!-- Card 19: Social Tweet Count -->
+          <div class="glass-card metric-card">
+            <div class="metric-title">Social Tweet Volume</div>
+            <div class="metric-value" id="val-tweet-count" style="color: var(--accent-blue);">0</div>
+            <div class="metric-footer">Social media volume index</div>
+          </div>
+
+          <!-- Card 20: Avg Classification Confidence -->
+          <div class="glass-card metric-card" style="height: 140px;">
+            <div class="metric-title">Model Confidence</div>
+            <div class="metric-value" id="val-avg-confidence" style="color: #c084fc; font-size: 1.6rem; margin-top: 0.25rem;">0.0%</div>
+            <div class="driver-bar-bg" style="width: 100%; height: 5px; margin: 0.35rem 0;">
+              <div class="driver-bar-fill" id="bar-avg-confidence" style="width: 0%; background: #a855f7; box-shadow: 0 0 8px rgba(168, 85, 247, 0.4);"></div>
+            </div>
+            <div class="metric-footer" style="margin-top: 0;">FinBERT decision certainty</div>
+          </div>
+
+          <!-- UP Probability (Hidden but bound for state updates) -->
+          <div style="display: none;">
+            <span id="val-prob-up">0%</span>
+            <span id="val-prob-down">0%</span>
+          </div>
+
         </div>
 
       </div>
@@ -1233,7 +1401,7 @@
 
 
     // --- Core API Interaction & Logic ---
-    const API_URL = "http://localhost:8000";
+    const API_URL = window.location.origin;
     let listAvailableTickers = [];
     let candlestickChartInstance = null; // ApexCharts container pointer
 
@@ -1258,7 +1426,7 @@
     // Fetch initial list of supported tickers from backend
     async function fetchSupportedTickers() {
       try {
-        const response = await fetch(`${API_URL}/`);
+        const response = await fetch(`${API_URL}/api/tickers`);
         if (response.ok) {
           const data = await response.json();
           listAvailableTickers = data.available_tickers;
@@ -1413,6 +1581,92 @@
       forecastTabContent.style.display = 'none';
       chartTabContent.style.display = 'none';
     });
+
+    // Metric sub-tabs switching event handlers
+    const mTabMarket = document.getElementById('m-tab-market');
+    const mTabTrend = document.getElementById('m-tab-trend');
+    const mTabSentiment = document.getElementById('m-tab-sentiment');
+    
+    const mContentMarket = document.getElementById('m-content-market');
+    const mContentTrend = document.getElementById('m-content-trend');
+    const mContentSentiment = document.getElementById('m-content-sentiment');
+
+    mTabMarket.addEventListener('click', () => {
+      mTabMarket.classList.add('active');
+      mTabTrend.classList.remove('active');
+      mTabSentiment.classList.remove('active');
+      mContentMarket.style.display = 'grid';
+      mContentTrend.style.display = 'none';
+      mContentSentiment.style.display = 'none';
+    });
+
+    mTabTrend.addEventListener('click', () => {
+      mTabTrend.classList.add('active');
+      mTabMarket.classList.remove('active');
+      mTabSentiment.classList.remove('active');
+      mContentTrend.style.display = 'grid';
+      mContentMarket.style.display = 'none';
+      mContentSentiment.style.display = 'none';
+    });
+
+    mTabSentiment.addEventListener('click', () => {
+      mTabSentiment.classList.add('active');
+      mTabMarket.classList.remove('active');
+      mTabTrend.classList.remove('active');
+      mContentSentiment.style.display = 'grid';
+      mContentMarket.style.display = 'none';
+      mContentTrend.style.display = 'none';
+    });
+
+    // Metric layout formatting utilities
+    function updateReturnCard(metricId, footerId, val) {
+      const valEl = document.getElementById(metricId);
+      const footerEl = document.getElementById(footerId);
+      const pctVal = val * 100;
+      const prefix = pctVal >= 0 ? "+" : "";
+      
+      animateNumber(metricId, pctVal, prefix, "%", true, 2);
+      valEl.style.color = pctVal >= 0 ? "var(--accent-green)" : "var(--accent-red)";
+      
+      if (footerEl) {
+        footerEl.innerHTML = pctVal >= 0 
+          ? `<span style="color: var(--accent-green); font-weight:600;">↑ Bullish</span> return`
+          : `<span style="color: var(--accent-red); font-weight:600;">↓ Bearish</span> return`;
+      }
+    }
+
+    function updateVolumeChangeCard(metricId, val) {
+      const valEl = document.getElementById(metricId);
+      const pctVal = val * 100;
+      const prefix = pctVal >= 0 ? "+" : "";
+      animateNumber(metricId, pctVal, prefix, "%", true, 2);
+      valEl.style.color = pctVal >= 0 ? "var(--accent-green)" : "var(--accent-red)";
+    }
+
+    function updateMACard(metricId, footerId, maVal, currentPrice) {
+      animateNumber(metricId, maVal, "$", "", true, 2);
+      const footerEl = document.getElementById(footerId);
+      if (footerEl) {
+        const isBullish = currentPrice >= maVal;
+        footerEl.innerHTML = isBullish 
+          ? `<span style="color: var(--accent-green); font-weight: 600;">Bullish (Support)</span>`
+          : `<span style="color: var(--accent-red); font-weight: 600;">Bearish (Resistance)</span>`;
+      }
+    }
+
+    function updateProgressBarCard(metricId, barId, val, isPercentage = true, decimals = 1, prefix = "", suffix = "%") {
+      const barEl = document.getElementById(barId);
+      const displayVal = isPercentage ? val * 100 : val;
+      
+      animateNumber(metricId, displayVal, prefix, suffix, true, decimals);
+      
+      if (barEl) {
+        const percentage = Math.max(0, Math.min(100, displayVal));
+        setTimeout(() => {
+          barEl.style.width = `${percentage}%`;
+        }, 150);
+      }
+    }
 
     // Predict Function Execution
     async function executePredict(tickerRaw) {
@@ -1715,6 +1969,19 @@
         // Animate metrics grid values
         animateNumber('val-price', data.current_price, "$", "", true, 2);
         
+        // Market & Lags bindings
+        updateReturnCard('val-daily-return-metric', 'lbl-daily-return', data.daily_return);
+        updateReturnCard('val-return-lag1', 'lbl-return-lag1', data.return_lag1);
+        updateReturnCard('val-return-lag2', 'lbl-return-lag2', data.return_lag2);
+        animateNumber('val-volatility', data.volatility * 100, "", "%", true, 2);
+        updateProgressBarCard('val-bb-position', 'bar-bb-position', data.bb_position, true, 1, "", "%");
+        updateVolumeChangeCard('val-volume-change', data.volume_change);
+        
+        // Trend & Momentum bindings
+        updateMACard('val-ma-5', 'lbl-ma-5', data.ma_5, data.current_price);
+        updateMACard('val-ma-20', 'lbl-ma-20', data.ma_20, data.current_price);
+        updateMACard('val-ma-50', 'lbl-ma-50', data.ma_50, data.current_price);
+
         // RSI Logic
         const rsiVal = document.getElementById('val-rsi');
         const rsiCondition = document.getElementById('rsi-condition');
@@ -1733,14 +2000,37 @@
         
         animateNumber('val-macd', data.macd, "", "", true, 3);
         document.getElementById('val-macd-signal').textContent = `Signal: ${data.macd_signal.toFixed(3)}`;
+        animateNumber('val-macd-signal-metric', data.macd_signal, "", "", true, 3);
         
-        animateNumber('val-volatility', data.volatility * 100, "", "%", true, 2);
+        // Sentiment & Social bindings
+        animateNumber('val-sentiment-mean', data.sentiment_mean, "", "", true, 3);
+        const lblSentimentMean = document.getElementById('lbl-sentiment-mean');
+        if (data.sentiment_mean > 0.15) {
+          lblSentimentMean.innerHTML = `<span style="color: var(--accent-green); font-weight:600;">Bullish Sentiment</span>`;
+        } else if (data.sentiment_mean < -0.15) {
+          lblSentimentMean.innerHTML = `<span style="color: var(--accent-red); font-weight:600;">Bearish Sentiment</span>`;
+        } else {
+          lblSentimentMean.innerHTML = `Neutral Sentiment`;
+        }
+        
+        animateNumber('val-weighted-sentiment', data.weighted_sentiment, "", "", true, 3);
+        const lblWeightedSentiment = document.getElementById('lbl-weighted-sentiment');
+        lblWeightedSentiment.innerHTML = data.weighted_sentiment >= 0 
+          ? `<span style="color: var(--accent-green); font-weight:600;">Bullish Impact</span>` 
+          : `<span style="color: var(--accent-red); font-weight:600;">Bearish Impact</span>`;
+          
+        updateProgressBarCard('val-pct-positive', 'bar-pct-positive', data.pct_positive, true, 1, "", "%");
+        updateProgressBarCard('val-pct-negative', 'bar-pct-negative', data.pct_negative, true, 1, "", "%");
+        updateProgressBarCard('val-avg-confidence', 'bar-avg-confidence', data.avg_confidence, true, 1, "", "%");
+        animateNumber('val-sentiment-std', data.sentiment_std, "", "", true, 3);
+        animateNumber('val-tweet-count', data.tweet_count, "", "", false, 0);
+
         animateNumber('val-prob-up', data.prob_up * 100, "", "%", false);
         animateNumber('val-prob-down', data.prob_down * 100, "", "%", false);
         
         // Volatility display return description
         const sign = data.daily_return >= 0 ? "+" : "";
-        document.getElementById('val-daily-return').innerHTML = `<span style="color: ${data.daily_return >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'}; font-weight:600;">${sign}${ (data.daily_return*100).toFixed(2) }%</span> today`;
+        document.getElementById('val-daily-return').innerHTML = `<span style="color: ${data.daily_return >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'}; font-weight:600;">${sign}${(data.daily_return*100).toFixed(2)}%</span> today`;
 
       } catch (err) {
         skeletonLoader.style.display = "none";
