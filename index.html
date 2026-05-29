@@ -1,0 +1,1781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stock Sentiment Predictor - FinBERT + XGBoost Terminal</title>
+  <!-- Google Fonts: Outfit for headings, Inter for body -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- ApexCharts for Technical Candlestick rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+  
+  <style>
+    /* --- CSS Reset & Custom Variables --- */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    :root {
+      --bg-color: #05070f;
+      --card-bg: rgba(17, 24, 39, 0.7);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --accent-blue: #3b82f6;
+      --accent-blue-glow: rgba(59, 130, 246, 0.3);
+      --accent-green: #10b981;
+      --accent-green-glow: rgba(16, 185, 129, 0.4);
+      --accent-red: #ef4444;
+      --accent-red-glow: rgba(239, 68, 68, 0.4);
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --font-heading: 'Outfit', sans-serif;
+      --font-body: 'Inter', sans-serif;
+      --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* --- Tab Switcher Styles --- */
+    .tabs-container {
+      display: flex;
+      gap: 1rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-family: var(--font-heading);
+      font-size: 1rem;
+      font-weight: 600;
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+      position: relative;
+      transition: var(--transition-smooth);
+    }
+
+    .tab-btn:hover {
+      color: #fff;
+    }
+
+    .tab-btn.active {
+      color: var(--accent-blue);
+      text-shadow: 0 0 10px var(--accent-blue-glow);
+    }
+
+    .tab-btn.active::after {
+      content: '';
+      position: absolute;
+      bottom: -0.6rem;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background: var(--accent-blue);
+      box-shadow: 0 0 8px var(--accent-blue);
+    }
+
+    /* --- Chart Container --- */
+    .chart-card-container {
+      padding: 1.75rem;
+      min-height: 420px;
+      animation: fadeIn 0.4s ease-out forwards;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    /* --- Forecast Drivers --- */
+    .drivers-section {
+      margin-top: 1.5rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding-top: 1.25rem;
+    }
+
+    .drivers-title {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      text-align: left;
+    }
+
+    .driver-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 0.6rem;
+      font-size: 0.85rem;
+    }
+
+    .driver-label {
+      color: #e5e7eb;
+      flex: 1;
+      text-align: left;
+    }
+
+    .driver-bar-bg {
+      width: 130px;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 9999px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .driver-bar-fill {
+      height: 100%;
+      border-radius: 9999px;
+      width: 0%; /* Will animate in JS */
+      transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .driver-bar-fill.bullish {
+      background: var(--accent-green);
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+    }
+
+    .driver-bar-fill.bearish {
+      background: var(--accent-red);
+      box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+    }
+
+    .driver-pct {
+      font-family: var(--font-heading);
+      font-weight: 700;
+      width: 45px;
+      text-align: right;
+    }
+
+    .driver-pct.bullish {
+      color: var(--accent-green);
+    }
+
+    .driver-pct.bearish {
+      color: var(--accent-red);
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      font-family: var(--font-body);
+      min-height: 100vh;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* --- Dynamic Canvas Particles Background --- */
+    #background-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    /* --- Container & Layout --- */
+    .app-container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 3rem 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+      min-height: 100vh;
+    }
+
+    /* --- Hero Header Section --- */
+    header {
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(59, 130, 246, 0.15);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      color: #93c5fd;
+      padding: 0.4rem 1rem;
+      border-radius: 9999px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 1.25rem;
+      box-shadow: 0 0 15px rgba(59, 130, 246, 0.1);
+      animation: pulseGlow 3s infinite ease-in-out;
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 0 15px rgba(59, 130, 246, 0.1); border-color: rgba(59, 130, 246, 0.3); }
+      50% { box-shadow: 0 0 25px rgba(59, 130, 246, 0.25); border-color: rgba(59, 130, 246, 0.6); }
+    }
+
+    h1 {
+      font-family: var(--font-heading);
+      font-size: 3rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      margin-bottom: 0.75rem;
+      background: linear-gradient(135deg, #ffffff 40%, #a5f3fc 70%, #3b82f6 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .lead {
+      color: var(--text-muted);
+      font-size: 1.125rem;
+      max-width: 600px;
+      margin: 0 auto;
+      font-weight: 300;
+      line-height: 1.6;
+    }
+
+    /* --- Glassmorphism Card Style --- */
+    .glass-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      transition: var(--transition-smooth);
+    }
+
+    /* --- Search Section --- */
+    .search-section {
+      padding: 2.5rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .search-section::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle, rgba(59, 130, 246, 0.05) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    .search-title {
+      font-family: var(--font-heading);
+      font-size: 1.35rem;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
+      color: #e5e7eb;
+    }
+
+    .input-wrapper {
+      display: flex;
+      max-width: 550px;
+      margin: 0 auto 1.25rem auto;
+      gap: 0.75rem;
+      position: relative;
+    }
+
+    .search-input {
+      flex: 1;
+      background: rgba(10, 15, 30, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 10px;
+      padding: 0.9rem 1.25rem;
+      font-size: 1.1rem;
+      font-family: var(--font-body);
+      color: #ffffff;
+      outline: none;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      transition: var(--transition-smooth);
+    }
+
+    .search-input::placeholder {
+      text-transform: none;
+      letter-spacing: 0;
+      color: #6b7280;
+    }
+
+    .search-input:focus {
+      border-color: var(--accent-blue);
+      box-shadow: 0 0 15px var(--accent-blue-glow);
+    }
+
+    .btn-search {
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      color: #ffffff;
+      border: none;
+      border-radius: 10px;
+      padding: 0 1.75rem;
+      font-family: var(--font-heading);
+      font-size: 1.05rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      transition: var(--transition-smooth);
+      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+    }
+
+    .btn-search:hover {
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(59, 130, 246, 0.6);
+    }
+
+    .btn-search:active {
+      transform: translateY(0);
+    }
+
+    .btn-search:disabled {
+      background: #374151;
+      color: #9ca3af;
+      cursor: not-allowed;
+      box-shadow: none;
+      transform: none;
+    }
+
+    /* --- Floating Quick Picks --- */
+    .quick-picks {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .quick-pick-title {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      margin-right: 0.5rem;
+    }
+
+    .btn-quick {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: #d1d5db;
+      border-radius: 9999px;
+      padding: 0.35rem 0.9rem;
+      font-size: 0.85rem;
+      font-family: var(--font-heading);
+      font-weight: 500;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+    }
+
+    .btn-quick:hover {
+      background: rgba(59, 130, 246, 0.15);
+      border-color: rgba(59, 130, 246, 0.4);
+      color: #93c5fd;
+      transform: translateY(-1px);
+    }
+
+    /* --- Recent Searches --- */
+    .recent-searches {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      padding-top: 1rem;
+      margin-top: 0.5rem;
+    }
+
+    .recent-searches-title {
+      font-weight: 500;
+    }
+
+    .recent-pill {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      color: #9ca3af;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+    }
+
+    .recent-pill:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.12);
+      color: #f3f4f6;
+    }
+
+    /* --- Loading Spinner --- */
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 0.8s linear infinite;
+      display: none;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* --- Skeleton Loader --- */
+    .skeleton-container {
+      display: none;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .skeleton-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 768px) {
+      .skeleton-row {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .skeleton-card {
+      height: 200px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .skeleton-card::after {
+      content: "";
+      display: block;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.04), transparent);
+      animation: loading-shimmer 1.5s infinite;
+    }
+
+    @keyframes loading-shimmer {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+
+    .skeleton-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+    }
+
+    .skeleton-mini-card {
+      height: 110px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      border-radius: 12px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .skeleton-mini-card::after {
+      content: "";
+      display: block;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.04), transparent);
+      animation: loading-shimmer 1.5s infinite;
+    }
+
+    /* --- Results Dashboard --- */
+    .dashboard-container {
+      display: none; /* Controlled via JS */
+      flex-direction: column;
+      gap: 1.5rem;
+      animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .top-cards-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 768px) {
+      .top-cards-row {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* --- Sentiment Card & Arrow Glow Animations --- */
+    .sentiment-card {
+      padding: 2.25rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      min-height: 220px;
+      overflow: hidden;
+    }
+
+    .sentiment-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 4px;
+    }
+
+    .sentiment-card.up-trend::before {
+      background: linear-gradient(90deg, #10b981, #059669);
+    }
+
+    .sentiment-card.down-trend::before {
+      background: linear-gradient(90deg, #ef4444, #dc2626);
+    }
+
+    .sentiment-card.up-trend {
+      box-shadow: 0 10px 40px rgba(16, 185, 129, 0.08);
+      border-color: rgba(16, 185, 129, 0.2);
+    }
+
+    .sentiment-card.down-trend {
+      box-shadow: 0 10px 40px rgba(239, 68, 68, 0.08);
+      border-color: rgba(239, 68, 68, 0.2);
+    }
+
+    .card-label {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 600;
+    }
+
+    .ticker-display {
+      font-family: var(--font-heading);
+      font-size: 2.25rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .sentiment-result-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      margin-top: 1.5rem;
+    }
+
+    .arrow-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      position: relative;
+    }
+
+    .up-trend .arrow-container {
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      color: var(--accent-green);
+      box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
+      animation: floatUp 2s infinite ease-in-out;
+    }
+
+    .down-trend .arrow-container {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.25);
+      color: var(--accent-red);
+      box-shadow: 0 0 20px rgba(239, 68, 68, 0.2);
+      animation: floatDown 2s infinite ease-in-out;
+    }
+
+    @keyframes floatUp {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+    }
+
+    @keyframes floatDown {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(6px); }
+    }
+
+    .sentiment-direction {
+      font-family: var(--font-heading);
+      font-size: 3rem;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      line-height: 1;
+    }
+
+    .up-trend .sentiment-direction {
+      color: var(--accent-green);
+      text-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+    }
+
+    .down-trend .sentiment-direction {
+      color: var(--accent-red);
+      text-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+    }
+
+    .sentiment-description {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+      line-height: 1.4;
+    }
+
+    /* --- Confidence Circular Gauge --- */
+    .confidence-card {
+      padding: 1.75rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      min-height: 220px;
+    }
+
+    .gauge-wrapper {
+      position: relative;
+      width: 120px;
+      height: 120px;
+      margin: 0.75rem 0;
+    }
+
+    .gauge-svg {
+      width: 100%;
+      height: 100%;
+      transform: rotate(-90deg);
+    }
+
+    .gauge-bg {
+      fill: none;
+      stroke: rgba(255, 255, 255, 0.05);
+      stroke-width: 9;
+    }
+
+    .gauge-fill {
+      fill: none;
+      stroke: var(--accent-blue);
+      stroke-width: 9;
+      stroke-linecap: round;
+      stroke-dasharray: 314.159;
+      stroke-dashoffset: 314.159; /* Dynamic */
+      transition: stroke-dashoffset 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .up-trend-gauge .gauge-fill {
+      stroke: var(--accent-green);
+      filter: drop-shadow(0 0 6px rgba(16, 185, 129, 0.5));
+    }
+
+    .down-trend-gauge .gauge-fill {
+      stroke: var(--accent-red);
+      filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.5));
+    }
+
+    .gauge-text {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-family: var(--font-heading);
+      font-size: 1.55rem;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    /* --- 6-Card Metrics Grid --- */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.25rem;
+    }
+
+    @media (max-width: 900px) {
+      .metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 550px) {
+      .metrics-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .metric-card {
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      height: 125px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .metric-title {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 600;
+    }
+
+    .metric-value {
+      font-family: var(--font-heading);
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: #ffffff;
+      margin-top: 0.5rem;
+    }
+
+    .metric-footer {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    /* Dynamic Colors for RSI */
+    .rsi-oversold {
+      color: var(--accent-green) !important;
+      text-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
+    }
+
+    .rsi-overbought {
+      color: var(--accent-red) !important;
+      text-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+    }
+
+    /* --- Error & Info Popups --- */
+    .error-card {
+      display: none; /* Controlled via JS */
+      padding: 2.25rem;
+      border-color: rgba(239, 68, 68, 0.25);
+      background: rgba(20, 10, 15, 0.85);
+      box-shadow: 0 10px 45px rgba(239, 68, 68, 0.08);
+      animation: fadeInUp 0.5s ease-out forwards;
+    }
+
+    .error-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      color: var(--accent-red);
+      font-family: var(--font-heading);
+      font-size: 1.35rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+    }
+
+    .error-body {
+      color: #d1d5db;
+      font-size: 0.95rem;
+      line-height: 1.5;
+      margin-bottom: 1.5rem;
+    }
+
+    .ticker-list-title {
+      font-family: var(--font-heading);
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #9ca3af;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.75rem;
+    }
+
+    .ticker-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .ticker-pill {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: #e5e7eb;
+      padding: 0.35rem 0.75rem;
+      border-radius: 6px;
+      font-family: var(--font-heading);
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+    }
+
+    .ticker-pill:hover {
+      background: rgba(59, 130, 246, 0.15);
+      border-color: rgba(59, 130, 246, 0.4);
+      color: #93c5fd;
+    }
+
+    /* --- Footer --- */
+    footer {
+      text-align: center;
+      margin-top: auto;
+      padding-top: 4rem;
+      font-size: 0.8rem;
+      color: #4b5563;
+      font-family: var(--font-body);
+    }
+
+    footer a {
+      color: #6b7280;
+      text-decoration: none;
+      transition: var(--transition-smooth);
+    }
+
+    footer a:hover {
+      color: var(--accent-blue);
+    }
+
+    /* --- Catalyst Feed --- */
+    .news-card-container {
+      padding: 1.75rem;
+      min-height: 420px;
+      animation: fadeIn 0.4s ease-out forwards;
+    }
+    .news-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      max-height: 450px;
+      overflow-y: auto;
+      padding-right: 0.5rem;
+    }
+    .news-list::-webkit-scrollbar {
+      width: 6px;
+    }
+    .news-list::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 3px;
+    }
+    .news-list::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+    }
+    .news-item-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      transition: var(--transition-smooth);
+    }
+    .news-item-row:hover {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(59, 130, 246, 0.2);
+      transform: translateY(-2px);
+    }
+    .news-title-link {
+      color: #f3f4f6;
+      text-decoration: none;
+      font-size: 0.95rem;
+      font-weight: 500;
+      transition: var(--transition-smooth);
+      flex: 1;
+      margin-right: 1.5rem;
+      text-align: left;
+    }
+    .news-title-link:hover {
+      color: var(--accent-blue);
+    }
+    .news-meta {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+    .news-sentiment-badge {
+      padding: 0.3rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+    .news-sentiment-badge.bullish {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: #34d399;
+      box-shadow: 0 0 10px rgba(16, 185, 129, 0.1);
+    }
+    .news-sentiment-badge.bearish {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #f87171;
+      box-shadow: 0 0 10px rgba(239, 68, 68, 0.1);
+    }
+    .news-sentiment-badge.neutral {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #9ca3af;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Dynamic Particle Canvas Background -->
+  <canvas id="background-canvas"></canvas>
+
+  <div class="app-container">
+    
+    <!-- Hero Header -->
+    <header>
+      <h1 id="main-title">Stock Sentiment Predictor</h1>
+      <p class="lead">Predict next-day price movements by combining news & social sentiment indexes with classic technical indicators.</p>
+    </header>
+
+    <!-- Search Terminal Terminal -->
+    <section class="glass-card search-section" id="search-terminal">
+      <h3 class="search-title">Enter Stock Ticker</h3>
+      <div class="input-wrapper">
+        <input type="text" id="ticker-input" class="search-input" placeholder="e.g. AAPL, TSLA, MSFT..." autocomplete="off" maxlength="10">
+        <button id="btn-predict" class="btn-search">
+          <span class="spinner" id="search-spinner"></span>
+          <span id="btn-text">Predict</span>
+          <svg id="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+        </button>
+      </div>
+
+      <!-- Quick Ticker Suggestions -->
+      <div class="quick-picks">
+        <span class="quick-pick-title">Popular Tickers:</span>
+        <button class="btn-quick" data-ticker="TSLA">TSLA</button>
+        <button class="btn-quick" data-ticker="AAPL">AAPL</button>
+        <button class="btn-quick" data-ticker="AMZN">AMZN</button>
+        <button class="btn-quick" data-ticker="GOOGL">GOOGL</button>
+        <button class="btn-quick" data-ticker="MSFT">MSFT</button>
+      </div>
+
+      <!-- Recent Searches -->
+      <div class="recent-searches" id="recent-searches-box" style="display: none;">
+        <span class="recent-searches-title">Recent:</span>
+        <span id="recent-searches-list"></span>
+      </div>
+    </section>
+
+    <!-- Skeleton Loader (Shown during fetching) -->
+    <section class="skeleton-container" id="skeleton-loader">
+      <div class="skeleton-row">
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+      </div>
+      <div class="skeleton-grid">
+        <div class="skeleton-mini-card"></div>
+        <div class="skeleton-mini-card"></div>
+        <div class="skeleton-mini-card"></div>
+        <div class="skeleton-mini-card"></div>
+        <div class="skeleton-mini-card"></div>
+        <div class="skeleton-mini-card"></div>
+      </div>
+    </section>
+
+    <!-- Error/Availability Popup -->
+    <section class="glass-card error-card" id="error-box">
+      <div class="error-header">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+        <span id="error-title">Data Unavailable</span>
+      </div>
+      <div class="error-body" id="error-message">
+        The requested ticker is not present in our sentiment database.
+      </div>
+      <div class="ticker-list-title">Supported Tickers</div>
+      <div class="ticker-grid" id="supported-tickers-grid">
+        <!-- Dynmically loaded via JS -->
+      </div>
+    </section>
+
+    <!-- Interactive Results Dashboard -->
+    <main class="dashboard-container" id="dashboard">
+      
+      <!-- Tab Switcher Navigation -->
+      <div class="tabs-container">
+        <button id="tab-forecast" class="tab-btn active">Forecast Terminal</button>
+        <button id="tab-chart" class="tab-btn">Technical Charts</button>
+        <button id="tab-news" class="tab-btn">Catalyst Feed</button>
+      </div>
+
+      <!-- Tab Content 1: Forecast Terminal -->
+      <div id="forecast-tab-content">
+        <div class="top-cards-row">
+          
+          <!-- Main Sentiment Card -->
+          <div class="glass-card sentiment-card" id="main-sentiment-card">
+            <div>
+              <div class="card-label">Next-Day Directional Forecast</div>
+              <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <div class="ticker-display" id="result-ticker">AAPL</div>
+                <span id="cached-badge" class="badge" style="display: none; margin-bottom: 0; padding: 0.2rem 0.6rem; font-size: 0.7rem; background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.3); color: #6ee7b7; text-shadow: 0 0 5px rgba(16, 185, 129, 0.2); animation: none; text-transform: uppercase; border-radius: 9999px;">Cached</span>
+              </div>
+            </div>
+            <div class="sentiment-result-wrapper">
+              <div class="arrow-container" id="result-arrow-container">
+                <!-- Inline SVG Arrow Up or Down -->
+                <svg id="svg-arrow-up" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="display: none;"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
+                <svg id="svg-arrow-down" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="display: none;"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
+              </div>
+              <div>
+                <span class="sentiment-direction" id="result-prediction">UP</span>
+                <p class="sentiment-description" id="result-summary">FinBERT sentiment combined with technical oscillators indicates strong upward momentum.</p>
+              </div>
+            </div>
+            
+            <!-- Forecast Drivers Section (Explainable AI) -->
+            <div class="drivers-section" id="drivers-section">
+              <div class="drivers-title">Forecast Drivers (Explainable AI)</div>
+              <div class="drivers-list" id="drivers-list">
+                <!-- Populated dynamically via JS -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Confidence Gauge Card -->
+          <div class="glass-card confidence-card" id="confidence-card-container">
+            <div class="card-label">Model Confidence</div>
+            <div class="gauge-wrapper">
+              <svg class="gauge-svg">
+                <circle class="gauge-bg" cx="60" cy="60" r="50"></circle>
+                <circle class="gauge-fill" id="confidence-gauge" cx="60" cy="60" r="50"></circle>
+              </svg>
+              <div class="gauge-text" id="confidence-text">0%</div>
+            </div>
+            <div class="card-label" style="font-size: 0.72rem; margin-top: 0.25rem;">Probability Split</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Content 2: Technical Candlestick Charts -->
+      <div class="glass-card chart-card-container" id="chart-tab-content" style="display: none;">
+        <div class="card-label" style="margin-bottom: 1.5rem; text-align: left;">30-Day Candlestick Chart (with 5-day & 20-day SMA overlays)</div>
+        <div id="apex-candlestick-chart"></div>
+      </div>
+
+      <!-- Tab Content 3: Live Catalyst Feed -->
+      <div class="glass-card news-card-container" id="news-tab-content" style="display: none;">
+        <div class="card-label" style="margin-bottom: 1.5rem; text-align: left;">Live Catalyst Feed (Real-Time Sentiment Extraction)</div>
+        <div id="news-list-container" class="news-list">
+          <!-- Populated dynamically via JS -->
+        </div>
+      </div>
+
+      <!-- 6-Card Metrics Grid -->
+      <div class="metrics-grid">
+        
+        <!-- Card 1: Close Price -->
+        <div class="glass-card metric-card">
+          <div class="metric-title">Current Close Price</div>
+          <div class="metric-value" id="val-price">$0.00</div>
+          <div class="metric-footer" id="val-daily-return">
+            <span>0.00%</span> today
+          </div>
+        </div>
+
+        <!-- Card 2: RSI -->
+        <div class="glass-card metric-card">
+          <div class="metric-title">RSI (14)</div>
+          <div class="metric-value" id="val-rsi">50.0</div>
+          <div class="metric-footer" id="rsi-condition">Neutral</div>
+        </div>
+
+        <!-- Card 3: MACD -->
+        <div class="glass-card metric-card">
+          <div class="metric-title">MACD (12,26)</div>
+          <div class="metric-value" id="val-macd">0.00</div>
+          <div class="metric-footer" id="val-macd-signal">Signal: 0.00</div>
+        </div>
+
+        <!-- Card 4: Volatility -->
+        <div class="glass-card metric-card">
+          <div class="metric-title">5-Day Volatility</div>
+          <div class="metric-value" id="val-volatility">0.00%</div>
+          <div class="metric-footer">Standard rolling variation</div>
+        </div>
+
+        <!-- Card 5: UP Probability -->
+        <div class="glass-card metric-card">
+          <div class="metric-title">UP Probability</div>
+          <div class="metric-value" id="val-prob-up" style="color: var(--accent-green);">0%</div>
+          <div class="metric-footer">XGBoost bullish index</div>
+        </div>
+
+        <!-- Card 6: DOWN Probability -->
+        <div class="glass-card metric-card">
+          <div class="metric-title">DOWN Probability</div>
+          <div class="metric-value" id="val-prob-down" style="color: var(--accent-red);">0%</div>
+          <div class="metric-footer">XGBoost bearish index</div>
+        </div>
+
+      </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer>
+      <p>&copy; 2026 Stock Sentiment Predictor Terminal. All rights reserved.</p>
+    </footer>
+
+  </div>
+
+  <script>
+    // --- Canvas Particles Background Animation ---
+    const canvas = document.getElementById('background-canvas');
+    const ctx = canvas.getContext('2d');
+    
+    let particles = [];
+    const maxParticles = 65;
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    class Particle {
+      constructor() {
+        this.x = Math.random() * canvas.width;
+        this.y = Math.random() * canvas.height;
+        this.vx = (Math.random() - 0.5) * 0.45;
+        this.vy = (Math.random() - 0.5) * 0.45;
+        this.radius = Math.random() * 2 + 1;
+        this.color = `rgba(59, 130, 246, ${Math.random() * 0.15 + 0.05})`; // Neon blue shade
+      }
+      
+      update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        
+        // Wrap edges
+        if (this.x < 0) this.x = canvas.width;
+        if (this.x > canvas.width) this.x = 0;
+        if (this.y < 0) this.y = canvas.height;
+        if (this.y > canvas.height) this.y = 0;
+      }
+      
+      draw() {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+      }
+    }
+
+    // Initialize particles
+    for (let i = 0; i < maxParticles; i++) {
+      particles.push(new Particle());
+    }
+
+    function animateParticles() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // Draw lines between nearby particles
+      for (let i = 0; i < particles.length; i++) {
+        particles[i].update();
+        particles[i].draw();
+        
+        for (let j = i + 1; j < particles.length; j++) {
+          const dx = particles[i].x - particles[j].x;
+          const dy = particles[i].y - particles[j].y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          
+          if (dist < 110) {
+            ctx.beginPath();
+            ctx.moveTo(particles[i].x, particles[i].y);
+            ctx.lineTo(particles[j].x, particles[j].y);
+            ctx.strokeStyle = `rgba(59, 130, 246, ${0.12 * (1 - dist / 110)})`;
+            ctx.lineWidth = 0.6;
+            ctx.stroke();
+          }
+        }
+      }
+      requestAnimationFrame(animateParticles);
+    }
+    animateParticles();
+
+
+    // --- Core API Interaction & Logic ---
+    const API_URL = "http://localhost:8000";
+    let listAvailableTickers = [];
+    let candlestickChartInstance = null; // ApexCharts container pointer
+
+    // DOM Nodes
+    const tickerInput = document.getElementById('ticker-input');
+    const btnPredict = document.getElementById('btn-predict');
+    const searchSpinner = document.getElementById('search-spinner');
+    const btnText = document.getElementById('btn-text');
+    const btnArrow = document.getElementById('btn-arrow');
+    const skeletonLoader = document.getElementById('skeleton-loader');
+    const dashboard = document.getElementById('dashboard');
+    const errorBox = document.getElementById('error-box');
+    const errorMessage = document.getElementById('error-message');
+    const supportedTickersGrid = document.getElementById('supported-tickers-grid');
+    const recentSearchesBox = document.getElementById('recent-searches-box');
+    const recentSearchesList = document.getElementById('recent-searches-list');
+    const cachedBadge = document.getElementById('cached-badge');
+    const tabNews = document.getElementById('tab-news');
+    const newsTabContent = document.getElementById('news-tab-content');
+    const newsListContainer = document.getElementById('news-list-container');
+
+    // Fetch initial list of supported tickers from backend
+    async function fetchSupportedTickers() {
+      try {
+        const response = await fetch(`${API_URL}/`);
+        if (response.ok) {
+          const data = await response.json();
+          listAvailableTickers = data.available_tickers;
+          renderSupportedTickers();
+        }
+      } catch (err) {
+        console.error("Backend connection failed.", err);
+        // Fallback static list in case backend is offline
+        listAvailableTickers = ["AAPL", "AMD", "AMZN", "BA", "BX", "COST", "CRM", "DIS", "ENPH", "F", "GOOG", "GOOGL", "INTC", "KO", "META", "MSFT", "NFLX", "NIO", "NOC", "PG", "PYPL", "TSLA", "TSM", "VZ", "XPEV", "ZS"];
+        renderSupportedTickers();
+      }
+    }
+
+    function renderSupportedTickers() {
+      supportedTickersGrid.innerHTML = "";
+      listAvailableTickers.forEach(ticker => {
+        const pill = document.createElement('span');
+        pill.className = "ticker-pill";
+        pill.textContent = ticker;
+        pill.addEventListener('click', () => {
+          tickerInput.value = ticker;
+          executePredict(ticker);
+        });
+        supportedTickersGrid.appendChild(pill);
+      });
+    }
+
+    // Number Counter Animation Function
+    function animateNumber(id, endVal, prefix = "", suffix = "", isFloat = false, decimals = 2) {
+      const obj = document.getElementById(id);
+      let startVal = 0;
+      const duration = 1000; // 1 second animation
+      const startTime = performance.now();
+
+      function updateNumber(now) {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        // EaseOutQuad
+        const easeVal = progress * (2 - progress);
+        const currentVal = startVal + easeVal * (endVal - startVal);
+        
+        if (isFloat) {
+          obj.textContent = prefix + currentVal.toFixed(decimals) + suffix;
+        } else {
+          obj.textContent = prefix + Math.floor(currentVal) + suffix;
+        }
+
+        if (progress < 1) {
+          requestAnimationFrame(updateNumber);
+        } else {
+          obj.textContent = prefix + (isFloat ? endVal.toFixed(decimals) : Math.floor(endVal)) + suffix;
+        }
+      }
+      requestAnimationFrame(updateNumber);
+    }
+
+    // Update Circular Confidence Gauge
+    function updateConfidenceGauge(percentage, isUpTrend) {
+      const ring = document.getElementById('confidence-gauge');
+      const text = document.getElementById('confidence-text');
+      const container = document.getElementById('confidence-card-container');
+      
+      // Reset classes
+      container.classList.remove('up-trend-gauge', 'down-trend-gauge');
+      if (isUpTrend) {
+        container.classList.add('up-trend-gauge');
+      } else {
+        container.classList.add('down-trend-gauge');
+      }
+
+      // 314.159 is the circumference of circle with radius 50
+      const offset = 314.159 - (percentage / 100) * 314.159;
+      ring.style.strokeDashoffset = offset;
+      
+      // Animate the text percentage
+      animateNumber('confidence-text', percentage, "", "%", false);
+    }
+
+    // Save and load search history
+    function getSearchHistory() {
+      const history = localStorage.getItem('recentSearches');
+      return history ? JSON.parse(history) : [];
+    }
+
+    function saveSearchHistory(ticker) {
+      let history = getSearchHistory();
+      // Remove duplicates
+      history = history.filter(item => item !== ticker);
+      // Prepend
+      history.unshift(ticker);
+      // Keep max 3
+      history = history.slice(0, 3);
+      localStorage.setItem('recentSearches', JSON.stringify(history));
+      renderSearchHistory();
+    }
+
+    function renderSearchHistory() {
+      const history = getSearchHistory();
+      if (history.length === 0) {
+        recentSearchesBox.style.display = "none";
+        return;
+      }
+      recentSearchesBox.style.display = "flex";
+      recentSearchesList.innerHTML = "";
+      history.forEach(ticker => {
+        const pill = document.createElement('span');
+        pill.className = "recent-pill";
+        pill.textContent = ticker;
+        pill.addEventListener('click', () => {
+          tickerInput.value = ticker;
+          executePredict(ticker);
+        });
+        recentSearchesList.appendChild(pill);
+      });
+    }
+
+    // Tab switching event handlers
+    const tabForecast = document.getElementById('tab-forecast');
+    const tabChart = document.getElementById('tab-chart');
+    const forecastTabContent = document.getElementById('forecast-tab-content');
+    const chartTabContent = document.getElementById('chart-tab-content');
+
+    tabForecast.addEventListener('click', () => {
+      tabForecast.classList.add('active');
+      tabChart.classList.remove('active');
+      tabNews.classList.remove('active');
+      forecastTabContent.style.display = 'block';
+      chartTabContent.style.display = 'none';
+      newsTabContent.style.display = 'none';
+    });
+
+    tabChart.addEventListener('click', () => {
+      tabChart.classList.add('active');
+      tabForecast.classList.remove('active');
+      tabNews.classList.remove('active');
+      chartTabContent.style.display = 'block';
+      forecastTabContent.style.display = 'none';
+      newsTabContent.style.display = 'none';
+      
+      // ApexCharts resize hack to fix render inside initially hidden div
+      if (candlestickChartInstance) {
+        window.dispatchEvent(new Event('resize'));
+      }
+    });
+
+    tabNews.addEventListener('click', () => {
+      tabNews.classList.add('active');
+      tabForecast.classList.remove('active');
+      tabChart.classList.remove('active');
+      newsTabContent.style.display = 'block';
+      forecastTabContent.style.display = 'none';
+      chartTabContent.style.display = 'none';
+    });
+
+    // Predict Function Execution
+    async function executePredict(tickerRaw) {
+      const ticker = tickerRaw.toUpperCase().trim();
+      if (!ticker) return;
+
+      // Show loader, hide dashboard & errors
+      btnPredict.disabled = true;
+      searchSpinner.style.display = "inline-block";
+      btnArrow.style.display = "none";
+      btnText.textContent = "Analyzing...";
+      
+      dashboard.style.display = "none";
+      errorBox.style.display = "none";
+      skeletonLoader.style.display = "flex";
+
+      // Reset Active Tab to Forecast Terminal
+      tabForecast.classList.add('active');
+      tabChart.classList.remove('active');
+      tabNews.classList.remove('active');
+      forecastTabContent.style.display = 'block';
+      chartTabContent.style.display = 'none';
+      newsTabContent.style.display = 'none';
+
+      // GOOGL translation
+      let lookupTicker = ticker;
+      if (ticker === "GOOGL") {
+        lookupTicker = "GOOG";
+      }
+
+      try {
+        const response = await fetch(`${API_URL}/predict`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ ticker: ticker })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          // Display styled availability card
+          skeletonLoader.style.display = "none";
+          errorBox.style.display = "block";
+          errorMessage.textContent = data.detail?.message || data.detail || "Server returned an error processing your query.";
+          
+          if (data.detail?.available_tickers) {
+            listAvailableTickers = data.detail.available_tickers;
+            renderSupportedTickers();
+          }
+          return;
+        }
+
+        // --- Render Prediction Success ---
+        skeletonLoader.style.display = "none";
+        dashboard.style.display = "flex";
+        
+        // Save to search history
+        saveSearchHistory(ticker);
+
+        // Header and Main Card Styling
+        const sentimentCard = document.getElementById('main-sentiment-card');
+        const arrowUpSvg = document.getElementById('svg-arrow-up');
+        const arrowDownSvg = document.getElementById('svg-arrow-down');
+        
+        sentimentCard.classList.remove('up-trend', 'down-trend');
+        
+        document.getElementById('result-ticker').textContent = data.ticker;
+        if (data.cached) {
+          cachedBadge.style.display = "inline-flex";
+        } else {
+          cachedBadge.style.display = "none";
+        }
+        document.getElementById('result-prediction').textContent = data.prediction;
+        
+        const isUp = data.prediction === "UP";
+        if (isUp) {
+          sentimentCard.classList.add('up-trend');
+          arrowUpSvg.style.display = "block";
+          arrowDownSvg.style.display = "none";
+          document.getElementById('result-summary').textContent = 
+            `Sentiment ratio of ${Math.round(data.bullish_ratio * 100)}% bullish index combined with key indicators indicates potential upward breakout.`;
+        } else {
+          sentimentCard.classList.add('down-trend');
+          arrowUpSvg.style.display = "none";
+          arrowDownSvg.style.display = "block";
+          document.getElementById('result-summary').textContent = 
+            `Weighted news sentiment is negative (${Math.round(data.sentiment_mean * 100) / 100}) and technical lines suggest downward pressure.`;
+        }
+
+        // Animate circular confidence ring
+        const confPercent = Math.round(data.confidence * 100);
+        updateConfidenceGauge(confPercent, isUp);
+
+        // Render Explainable AI Forecast Drivers
+        const driversList = document.getElementById('drivers-list');
+        driversList.innerHTML = '';
+        if (data.drivers && data.drivers.length > 0) {
+          document.getElementById('drivers-section').style.display = 'block';
+          data.drivers.forEach(driver => {
+            const item = document.createElement('div');
+            item.className = 'driver-item';
+            
+            const isBullish = driver.type === 'BULLISH';
+            const typeClass = isBullish ? 'bullish' : 'bearish';
+            
+            item.innerHTML = `
+              <span class="driver-label">${driver.label}</span>
+              <div class="driver-bar-bg">
+                <div class="driver-bar-fill ${typeClass}" id="driver-bar-${driver.feature}"></div>
+              </div>
+              <span class="driver-pct ${typeClass}">${driver.impact}%</span>
+            `;
+            driversList.appendChild(item);
+            
+            // Trigger micro-animation width trigger
+            setTimeout(() => {
+              const bar = document.getElementById(`driver-bar-${driver.feature}`);
+              if (bar) bar.style.width = `${driver.impact}%`;
+            }, 100);
+          });
+        } else {
+          document.getElementById('drivers-section').style.display = 'none';
+        }
+
+        // Render Live News catalyst feed
+        newsListContainer.innerHTML = "";
+        if (data.headlines && data.headlines.length > 0) {
+          data.headlines.forEach(newsItem => {
+            const row = document.createElement('div');
+            row.className = 'news-item-row';
+            
+            let cleanDate = 'Recent';
+            if (newsItem.date) {
+              try {
+                cleanDate = new Date(newsItem.date).toLocaleDateString(undefined, {
+                  month: 'short', 
+                  day: 'numeric', 
+                  hour: '2-digit', 
+                  minute: '2-digit'
+                });
+              } catch (e) {
+                cleanDate = newsItem.date;
+              }
+            }
+            
+            const sentimentClass = newsItem.sentiment.toLowerCase();
+            
+            row.innerHTML = `
+              <div style="flex: 1; text-align: left;">
+                <a href="${newsItem.link}" target="_blank" class="news-title-link">${newsItem.title}</a>
+                <div class="news-meta">${cleanDate}</div>
+              </div>
+              <span class="news-sentiment-badge ${sentimentClass}">${newsItem.sentiment}</span>
+            `;
+            newsListContainer.appendChild(row);
+          });
+        } else {
+          newsListContainer.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 3rem;">No live catalyst articles found.</div>`;
+        }
+
+        // Render ApexCharts Candlestick + Line Overlays
+        if (candlestickChartInstance) {
+          candlestickChartInstance.destroy();
+          candlestickChartInstance = null;
+        }
+
+        if (data.chart_data && data.chart_data.length > 0) {
+          const ohlcSeries = data.chart_data.map(item => ({
+            x: item.time,
+            y: item.ohlc
+          }));
+
+          const ma5Series = data.chart_data.map(item => ({
+            x: item.time,
+            y: item.ma_5
+          }));
+
+          const ma20Series = data.chart_data.map(item => ({
+            x: item.time,
+            y: item.ma_20
+          }));
+
+          const chartOptions = {
+            series: [
+              {
+                name: 'Price OHLC',
+                type: 'candlestick',
+                data: ohlcSeries
+              },
+              {
+                name: '5-Day SMA',
+                type: 'line',
+                data: ma5Series
+              },
+              {
+                name: '20-Day SMA',
+                type: 'line',
+                data: ma20Series
+              }
+            ],
+            chart: {
+              height: 360,
+              type: 'line',
+              toolbar: {
+                show: false
+              },
+              background: 'transparent',
+              fontFamily: 'Inter, sans-serif'
+            },
+            theme: {
+              mode: 'dark'
+            },
+            stroke: {
+              width: [1, 2, 2],
+              curve: 'smooth'
+            },
+            title: {
+              show: false
+            },
+            xaxis: {
+              type: 'datetime',
+              labels: {
+                style: {
+                  colors: '#9ca3af',
+                  fontSize: '11px'
+                }
+              },
+              axisBorder: {
+                show: false
+              },
+              axisTicks: {
+                show: false
+              }
+            },
+            yaxis: {
+              tooltip: {
+                enabled: true
+              },
+              labels: {
+                style: {
+                  colors: '#9ca3af',
+                  fontSize: '11px'
+                },
+                formatter: function (val) {
+                  return '$' + val.toFixed(2);
+                }
+              }
+            },
+            grid: {
+              borderColor: 'rgba(255, 255, 255, 0.05)',
+              strokeDashArray: 4,
+              xaxis: {
+                lines: {
+                  show: true
+                }
+              }
+            },
+            plotOptions: {
+              candlestick: {
+                colors: {
+                  upward: '#10b981',
+                  downward: '#ef4444'
+                },
+                wick: {
+                  useFillColor: true
+                }
+              }
+            },
+            colors: ['#10b981', '#3b82f6', '#f59e0b'],
+            tooltip: {
+              shared: true,
+              custom: function({series, seriesIndex, dataPointIndex, w}) {
+                const o = w.config.series[0].data[dataPointIndex].y;
+                const m5 = w.config.series[1].data[dataPointIndex].y;
+                const m20 = w.config.series[2].data[dataPointIndex].y;
+                const dt = new Date(w.config.series[0].data[dataPointIndex].x).toLocaleDateString(undefined, {month: 'short', day: 'numeric'});
+                return `<div class="glass-card" style="padding: 12px; font-family: Inter, sans-serif; font-size:12px; line-height: 1.6; background: rgba(10, 14, 26, 0.95); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; color: #f3f4f6; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">` +
+                  `<div style="font-weight: 700; margin-bottom: 6px; color: #3b82f6; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom:4px;">${dt}</div>` +
+                  `<div>Open: <span style="font-weight:600; float:right;">$${o[0].toFixed(2)}</span></div>` +
+                  `<div>High: <span style="font-weight:600; color:#10b981; float:right;">$${o[1].toFixed(2)}</span></div>` +
+                  `<div>Low: <span style="font-weight:600; color:#ef4444; float:right;">$${o[2].toFixed(2)}</span></div>` +
+                  `<div style="margin-bottom:4px;">Close: <span style="font-weight:600; float:right;">$${o[3].toFixed(2)}</span></div>` +
+                  `<div style="margin-top: 6px; border-top: 1px solid rgba(255,255,255,0.08); padding-top:6px; font-size:11px;">` +
+                    `<span style="color:#3b82f6;">MA-5: $${m5.toFixed(2)}</span><span style="color:#f59e0b; float:right;">MA-20: $${m20.toFixed(2)}</span>` +
+                  `</div>` +
+                `</div>`;
+              }
+            }
+          };
+
+          candlestickChartInstance = new ApexCharts(
+            document.querySelector("#apex-candlestick-chart"),
+            chartOptions
+          );
+          candlestickChartInstance.render();
+        }
+
+        // Animate metrics grid values
+        animateNumber('val-price', data.current_price, "$", "", true, 2);
+        
+        // RSI Logic
+        const rsiVal = document.getElementById('val-rsi');
+        const rsiCondition = document.getElementById('rsi-condition');
+        rsiVal.textContent = data.rsi.toFixed(1);
+        
+        rsiVal.className = "metric-value"; // reset
+        if (data.rsi <= 30) {
+          rsiVal.classList.add('rsi-oversold');
+          rsiCondition.textContent = "Oversold (<30)";
+        } else if (data.rsi >= 70) {
+          rsiVal.classList.add('rsi-overbought');
+          rsiCondition.textContent = "Overbought (>70)";
+        } else {
+          rsiCondition.textContent = "Neutral";
+        }
+        
+        animateNumber('val-macd', data.macd, "", "", true, 3);
+        document.getElementById('val-macd-signal').textContent = `Signal: ${data.macd_signal.toFixed(3)}`;
+        
+        animateNumber('val-volatility', data.volatility * 100, "", "%", true, 2);
+        animateNumber('val-prob-up', data.prob_up * 100, "", "%", false);
+        animateNumber('val-prob-down', data.prob_down * 100, "", "%", false);
+        
+        // Volatility display return description
+        const sign = data.daily_return >= 0 ? "+" : "";
+        document.getElementById('val-daily-return').innerHTML = `<span style="color: ${data.daily_return >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'}; font-weight:600;">${sign}${ (data.daily_return*100).toFixed(2) }%</span> today`;
+
+      } catch (err) {
+        skeletonLoader.style.display = "none";
+        errorBox.style.display = "block";
+        errorMessage.textContent = "Network Error: Could not establish a connection to the FastAPI backend. Make sure the server is running on http://localhost:8000.";
+      } finally {
+        btnPredict.disabled = false;
+        searchSpinner.style.display = "none";
+        btnArrow.style.display = "inline-block";
+        btnText.textContent = "Predict";
+      }
+    }
+
+    // Event Listeners
+    btnPredict.addEventListener('click', () => executePredict(tickerInput.value));
+    
+    tickerInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        executePredict(tickerInput.value);
+      }
+    });
+
+    // Popular tags selection
+    document.querySelectorAll('.btn-quick').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const ticker = btn.getAttribute('data-ticker');
+        tickerInput.value = ticker;
+        executePredict(ticker);
+      });
+    });
+
+    // Init Load
+    fetchSupportedTickers();
+    renderSearchHistory();
+
+  </script>
+</body>
+</html>
